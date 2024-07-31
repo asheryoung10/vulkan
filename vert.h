@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-const uint32_t ShaderByteCode[] = {
+const uint32_t vertShaderByteCode[] = {
     0x07230203,
     0x00072302,
     0x00000723,
@@ -898,10 +898,10 @@ const uint32_t ShaderByteCode[] = {
     0x00180000,
     0x00001800,
     0x00000018,
-    0x0d000000,
-    0x000d0000,
-    0x00000d00,
-    0x0000000d,
+    0x18000000,
+    0x00180000,
+    0x00001800,
+    0x00000018,
     0x18000000,
     0x00180000,
     0x00001800,
@@ -1502,7 +1502,7 @@ const uint32_t ShaderByteCode[] = {
     0x00000000,
     0x00000000,
     0x00000000,
-    0x3a000000,
-    0x403a0000,
-    0xcd403a00,
-}
+    0x6d000000,
+    0x1a6d0000,
+    0x091a6d00,
+};

@@ -4,5 +4,5 @@ cd spvToHeader/
 call build.bat
 call spvToHeaders.exe ../vert.spv ../frag.spv
 cd ..
-MOVE vert.spv.h ..
-MOVE frag.spv.h ..
+MOVE vert.h ..
+MOVE frag.h ..

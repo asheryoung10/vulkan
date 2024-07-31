@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-const uint32_t ShaderByteCode[] = {
+const uint32_t fragShaderByteCode[] = {
     0x07230203,
     0x00072302,
     0x00000723,
@@ -570,7 +570,7 @@ const uint32_t ShaderByteCode[] = {
     0x00380001,
     0x01003800,
     0x00010038,
-    0x30000100,
-    0x30300001,
-    0x04303000,
-}
+    0x20000100,
+    0x30200001,
+    0x04302000,
+};

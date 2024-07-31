@@ -8,7 +8,8 @@
 #include <string.h>
 #include "ext.h"
 #include "helper.h"
-
+#include "vert.h"
+#include "frag.h"
 struct QueueFamilyIndices {
     bool hasGraphics;
     uint32_t graphics;
@@ -326,6 +327,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL
     void* pUserData) {
     if(messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         fprintf(stderr, "Validation Layers: %s\n", pCallbackData->pMessage);
+    }
+    if(messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        printf("INFO vvv\n");
+        printf("\t%s\n", pCallbackData->pMessage);
+        printf("Info ^^^\n");
     }
     return VK_FALSE;
 }
@@ -694,7 +700,7 @@ void createRenderPass() {
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-            renderPassInfo.dependencyCount = 1;
+            renderPassInfo.dependencyCount = 1; //CHANGEW TO !
     renderPassInfo.pDependencies = &dependency;
 
     if (vkCreateRenderPass(device, &renderPassInfo, NULL, &renderPass) != VK_SUCCESS) {
@@ -706,10 +712,8 @@ void createRenderPass() {
 void createGraphicsPipeline() { 
     uint32_t vertexSize;
     uint32_t fragSize;
-    char* vertShaderCode = readFile("shaders/vert.spv", &vertexSize);
-    char* fragShaderCode = readFile("shaders/frag.spv", &fragSize);
-    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, vertexSize);
-    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, fragSize);
+    VkShaderModule vertShaderModule = createShaderModule((char*)vertShaderByteCode, vertexSize);
+    VkShaderModule fragShaderModule = createShaderModule((char*)fragShaderByteCode, fragSize);
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
