@@ -49,7 +49,6 @@ VkCommandBuffer commandBuffers[MAX_FRAMES_IN_FLIGHT];
 VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
 VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
 VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
-bool framebufferResized = false;
 //Functions:
 void initWindow();
 
@@ -93,11 +92,11 @@ void createSyncObjects();
 
 void mainLoop();
 void drawFrame();
-void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
 
 void cleanup();
 
+void framebufferResized(GLFWwindow* window, int width, int height);
 //Variables:
 GLFWwindow* window;
 const uint32_t WIDTH = 800;
@@ -154,8 +153,7 @@ void initWindow() {
         fprintf(stderr, "Failed to create window, aborting.");
         EXIT_FAILURE;
     }
-    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-
+    glfwSetFramebufferSizeCallback(window, framebufferResized);
 }
 
 void initVulkan() {
@@ -327,11 +325,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL
     void* pUserData) {
     if(messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         fprintf(stderr, "Validation Layers: %s\n", pCallbackData->pMessage);
-    }
-    if(messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-        printf("INFO vvv\n");
-        printf("\t%s\n", pCallbackData->pMessage);
-        printf("Info ^^^\n");
     }
     return VK_FALSE;
 }
@@ -710,10 +703,8 @@ void createRenderPass() {
 
 }
 void createGraphicsPipeline() { 
-    uint32_t vertexSize;
-    uint32_t fragSize;
-    VkShaderModule vertShaderModule = createShaderModule((char*)vertShaderByteCode, vertexSize);
-    VkShaderModule fragShaderModule = createShaderModule((char*)fragShaderByteCode, fragSize);
+    VkShaderModule vertShaderModule = createShaderModule((char*)vertShaderByteCode, sizeof(vertShaderByteCode));
+    VkShaderModule fragShaderModule = createShaderModule((char*)fragShaderByteCode, sizeof(fragShaderByteCode));
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -844,8 +835,6 @@ void createGraphicsPipeline() {
 
     vkDestroyShaderModule(device, vertShaderModule, NULL);
     vkDestroyShaderModule(device, fragShaderModule, NULL);
-    free(vertShaderCode);
-    free(fragShaderCode);
 }
 VkShaderModule createShaderModule(char* code, uint32_t size) {
     VkShaderModuleCreateInfo createInfo= {};
@@ -978,12 +967,12 @@ void createSyncObjects() {
     }
 }
 void recreateSwapchain() {
+    
     vkDeviceWaitIdle(device);
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     while(width == 0 || height == 0) {
-        glfwGetFramebufferSize(window, &width, &height);
-        glfwWaitEvents();
+        return;
     }
     cleanupSwapchain();
     createSwapchain();
@@ -1020,6 +1009,7 @@ void drawFrame() {
     VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
                          &imageIndex);
     if(result == VK_ERROR_OUT_OF_DATE_KHR) {
+        fprintf(stderr, "OUT OF DATE in draw()");
         recreateSwapchain();
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -1055,8 +1045,8 @@ void drawFrame() {
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = NULL;
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
-    if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-        framebufferResized = false;
+    if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        fprintf(stderr, "Resizing swapchain in draw()");
         recreateSwapchain();
     } else if (result != VK_SUCCESS) {
         fprintf(stderr, "vkQueuePresentKHR failed, aborting.");
@@ -1087,9 +1077,7 @@ void cleanup() {
     glfwTerminate();
 }
 
-void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-    printf("FRAME BUFFER RESIZED %d %d\n", width, height);
-    framebufferResized = true;
-    drawFrame();
+void framebufferResized(GLFWwindow* window, int width, int height) {
+    recreateSwapchain();
     drawFrame();
 }

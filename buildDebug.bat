@@ -1,4 +1,4 @@
-@echo off
+@echo on
 cd shaders
 call compile.bat
 cd ..
