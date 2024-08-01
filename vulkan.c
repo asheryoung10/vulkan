@@ -1,4 +1,5 @@
 #include "vulkan/vulkan_core.h"
+#include <math.h>
 #include <stdint.h>
 #include <time.h>
 #include <vulkan/vulkan.h>
@@ -1162,7 +1163,23 @@ void cleanupSwapchain() {
 
 }
 void mainLoop() {
+    const GLFWvidmode* videoMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    int width = videoMode->width;
+    int height = videoMode->height;
+    double x = 0;
+    double y = 0;
+    double heightOverWidth = (double)height/width;
     while (!glfwWindowShouldClose(window)) {
+        x = 0;
+        y = 0;
+        x = x + heightOverWidth*0.5*cos(glfwGetTime());
+        y = y + 0.5*sin(glfwGetTime()*2);
+        int winWidth, winHeight;
+        glfwGetWindowSize(window, &winWidth, &winHeight);
+        fprintf(stderr, "%f %f\n", x, y);
+        int ix = x * (float)width/2 + (float)width/2 - (float)winWidth/2;
+        int iy = y * (float)height/2 + (float)height/2 - (float)winHeight/2;
+        glfwSetWindowPos(window, ix, iy);
         glfwPollEvents();
         drawFrame();
     }
