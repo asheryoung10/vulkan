@@ -1,3 +1,4 @@
+#include "vulkan/vulkan_core.h"
 #include <stdint.h>
 #include <time.h>
 #include <vulkan/vulkan.h>
@@ -56,20 +57,19 @@ VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
 VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
 VkBuffer vertexBuffer;
 VkDeviceMemory vertexBufferMemory;
+VkBuffer indexBuffer;
+VkDeviceMemory indexBufferMemory;
 
 const float vertexData[] = {
     // first triangle
-    0.0f, -0.5f,    1.0f, 0.0f, 0.0f,
-    0.5f, 0.5f,     0.0f, 1.0f, 0.0f,
-    -0.5f, 0.5f,    0.0f, 0.0f, 1.0f,
-    // second triangle 
-    0.4f, -0.5f, 0.0f, 1.0f, 0.0f,
-    0.9f, 0.3f, 0.0f, 0.0f, 1.0f,
-    0.0f, 0.2f, 0.0f, 1.0f, 1.0f,
-    // second triangle
-    0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
-    1.0f, 0.5f, 0.0f, 1.0f, 1.0f,
-    0.0f, 0.5f, 0.0f, 1.0f, 1.0f,
+    -0.5f, -0.5f,    1.0f, 0.0f, 0.0f,
+    0.5f, -0.5f,     0.0f, 1.0f, 0.0f,
+    0.5f, 0.5f,    0.0f, 0.0f, 1.0f,
+    -0.5f, 0.5f, .0f, .0f, .0f,
+};
+
+const uint16_t indexData[] = {
+    0, 1, 2, 2, 3, 0       
 };
 
 VkVertexInputBindingDescription getVertexDataBindingDescription() {
@@ -131,7 +131,8 @@ void createFramebuffers();
 void createCommandPool();
 void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, 
                   VkBuffer* buffer, VkDeviceMemory* deviceMemory);
-void createVertexBuffers();
+void createVertexBuffer();
+void createIndexBuffer();
 void createCommandBuffers();
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -211,7 +212,8 @@ void initVulkan() {
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
-    createVertexBuffers();
+    createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -958,18 +960,80 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
         exit(EXIT_FAILURE);
     }
 
-    vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    vkBindBufferMemory(device, *buffer, *deviceMemory, 0);
 
 }
-void createVertexBuffers() {
+void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion = {};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+    vkEndCommandBuffer(commandBuffer);
+
+
+    VkSubmitInfo submitInfo  = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, NULL);
+    vkQueueWaitIdle(graphicsQueue);
+    
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+void createVertexBuffer() {
     VkDeviceSize bufferSize = sizeof(vertexData);
-    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 &vertexBuffer, &vertexBufferMemory);
-       void* data;
-    vkMapMemory(device, vertexBufferMemory, 0, bufferSize, 0, &data);
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, 
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, vertexData, bufferSize);
-    vkUnmapMemory(device, vertexBufferMemory);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, &vertexBuffer, &vertexBufferMemory);
+
+    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    vkDestroyBuffer(device, stagingBuffer, NULL);
+    vkFreeMemory(device, stagingBufferMemory, NULL);
+}
+void createIndexBuffer() {
+    VkDeviceSize bufferSize = sizeof(indexData);
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, 
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indexData, bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_HEAP_DEVICE_LOCAL_BIT, &indexBuffer, &indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    vkDestroyBuffer(device, stagingBuffer, NULL);
+    vkFreeMemory(device, stagingBufferMemory, NULL);
 
 }
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -1028,6 +1092,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkBuffer vertexBuffers[] = {vertexBuffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets); 
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     VkViewport viewport={};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -1042,7 +1107,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     scissor.offset = offset;
     scissor.extent = swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    vkCmdDraw(commandBuffer, sizeof(vertexData)/(sizeof(float)*5), 1, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, sizeof(indexData)/(sizeof(uint16_t)), 1, 0, 0, 0);
     
     vkCmdEndRenderPass(commandBuffer);
     if(vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -1163,6 +1228,8 @@ void cleanup() {
     cleanupSwapchain();
     vkDestroyBuffer(device, vertexBuffer, NULL);
     vkFreeMemory(device, vertexBufferMemory, NULL);
+    vkDestroyBuffer(device, indexBuffer, NULL);
+    vkFreeMemory(device, indexBufferMemory, NULL);
     for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], NULL);
         vkDestroySemaphore(device, renderFinishedSemaphores[i], NULL);
